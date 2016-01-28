@@ -1,15 +1,16 @@
 """
 pygooglesms.py
 Author: Reilly Steele
-Modified: January 27th 2016
+Modified: January 28th 2016
 
 A super simple library used to send SMS messages from a google voice account.
 Absolutely inspired by pygooglevoice, thanks Joe McCall & Justin Quick.
 
 Usage:
     >>> from pygooglesms import GoogleSMS
-    >>> gsms = GOogleSMS('email@gmail.com', 'password')
+    >>> gsms = GoogleSMS('email@gmail.com', 'password')
     >>> gsms.send('4445556666', 'yo dawg')
+    >>>
 
 Notes:
     You probably need to log in from the same IP manually before using this
