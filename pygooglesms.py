@@ -82,7 +82,7 @@ class GoogleSMS(object):
         request = self._get(LOGIN_PAGE_PRE)
 
         params = {}
-        soup = BeautifulSoup(request.text, "html5lib")
+        soup = BeautifulSoup(request.text, "html.parser")
         form_children = soup.find("form").findChildren()
         for child in form_children:
             name = child.get("name")
@@ -97,7 +97,7 @@ class GoogleSMS(object):
         sid = self.cookies.get("SID")
         request = self._post(GV_PAGE % sid)
 
-        soup = BeautifulSoup(request.text, "html5lib")
+        soup = BeautifulSoup(request.text, "html.parser")
         self._rnr_se = soup.find(attrs={"name":"_rnr_se"}).get("value")
 
     def send(self, phone_number, text):
