@@ -19,11 +19,25 @@ Notes:
 
 from bs4 import BeautifulSoup
 import requests
+import json
 
 LOGIN_PAGE_PRE = "https://accounts.google.com/ServiceLogin?service=grandcentral"
 LOGIN_PAGE_AUTH = "https://accounts.google.com/ServiceLoginAuth"
 GV_PAGE = "https://google.com/voice?pli=1&auth=%s"
 SMS_PAGE = "https://www.google.com/voice/sms/send/"
+
+class GoogleAuthError(Exception):
+    def __init__(self, msg, request):
+        self.msg = msg
+        self.request = request
+
+class GoogleVoiceError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+class InternalError(Exception):
+    def __init__(self, payload):
+        self.payload = payload
 
 
 class GoogleSMS(object):
@@ -51,7 +65,12 @@ class GoogleSMS(object):
                 if cookie in self._interesting_cookies:
                     self.cookies.set(cookie, request.cookies.get(cookie))
 
-    def _request(self, method, url, params, fail_ok=False):
+    def _validate_request(self, request):
+        if request.status_code != 200:
+            return False
+        return True
+
+    def _request(self, method, url, params, no_validate=False):
         """ Issues a request using the object's cookies, expects only status
         code 200 unless otherwise specified """
         if method == "GET":
@@ -59,10 +78,8 @@ class GoogleSMS(object):
         elif method == "POST":
             request = requests.post(url, params=params, cookies=self.cookies)
 
-        if not fail_ok and request.status_code != 200:
-            raise RuntimeError('Status code for request to %s '
-                    'was %d expected 200!' % (request.request.url,
-                    request.status_code), request)
+        if not no_validate and request.status_code != 200:
+            raise RuntimeError(request)
         self._update_cookies(request)
         return request
 
@@ -74,12 +91,30 @@ class GoogleSMS(object):
         """ Convenience for post requests """
         return self._request("POST", url, params)
 
+    def _validate_gv(self, request):
+        """ Validates the content of the GV page after the requests completes.
+        This will raise an error if the logged in user does not have a google
+        voice number configured """
+        soup = BeautifulSoup(request.text, "html.parser")
+
+        scripts = soup.findAll("script")
+        gcData_script = scripts[-1]
+        gcData_text = gcData_script.text
+        if "'formatted'" not in gcData_text:
+            raise GoogleVoiceError('No GoogleVoice number found, have you '
+                'configured GoogleVoice?')
+        # TODO: extract phone number
+
     def login(self, email, passwd):
         """ Logs the user in to google voice and gathers the info required to
         send sms messages, can be called again to switch accounts """
         self.cookies = requests.cookies.RequestsCookieJar()
+        self._rnr_se = None
 
-        request = self._get(LOGIN_PAGE_PRE)
+        try:
+            request = self._get(LOGIN_PAGE_PRE)
+        except InternalError as error:
+            raise GoogleAuthError('Could not load Google login', error.payload)
 
         params = {}
         soup = BeautifulSoup(request.text, "html.parser")
@@ -92,16 +127,30 @@ class GoogleSMS(object):
         params["Email"] = email
         params["Passwd"] = passwd
 
-        request = self._post(LOGIN_PAGE_AUTH, params)
+        try:
+            request = self._post(LOGIN_PAGE_AUTH, params)
+        except InternalError as error:
+            raise GoogleAuthError("Could not authenticate", error.payload)
 
         sid = self.cookies.get("SID")
-        request = self._post(GV_PAGE % sid)
+        if sid is None:
+            raise GoogleAuthError("No auth token provided by server (Bad "
+                    "account?)", None)
+
+        try:
+            request = self._post(GV_PAGE % sid)
+            self._validate_gv(request)
+        except InternalError as error:
+            raise GoogleVoiceError('Could not load GoogleVoice', error.payload)
 
         soup = BeautifulSoup(request.text, "html.parser")
         self._rnr_se = soup.find(attrs={"name":"_rnr_se"}).get("value")
 
     def send(self, phone_number, text):
         """ Sends an SMS message """
+        if self._rnr_se is None:
+            raise GoogleVoiceError("Not logged in")
+
         params = {'phoneNumber' : phone_number,
                 'text' : text,
                 '_rnr_se' : self._rnr_se,
