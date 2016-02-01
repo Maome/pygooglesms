@@ -19,7 +19,6 @@ Notes:
 
 from bs4 import BeautifulSoup
 import requests
-import json
 
 LOGIN_PAGE_PRE = "https://accounts.google.com/ServiceLogin?service=grandcentral"
 LOGIN_PAGE_AUTH = "https://accounts.google.com/ServiceLoginAuth"
@@ -27,16 +26,20 @@ GV_PAGE = "https://google.com/voice?pli=1&auth=%s"
 SMS_PAGE = "https://www.google.com/voice/sms/send/"
 
 class GoogleAuthError(Exception):
-    def __init__(self, msg, request):
-        self.msg = msg
+    """ Exception for failures during authentication attempts """
+    def __init__(self, message, request):
+        super(GoogleAuthError, self).__init__(message)
+        self.message = message
         self.request = request
 
 class GoogleVoiceError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
+    """ Exception for failures unrelated to Authentication """
+    pass
 
 class InternalError(Exception):
+    """ Exception for internal errors used to pass failure information """
     def __init__(self, payload):
+        super(InternalError, self).__init__('InternalError')
         self.payload = payload
 
 
@@ -65,11 +68,6 @@ class GoogleSMS(object):
                 if cookie in self._interesting_cookies:
                     self.cookies.set(cookie, request.cookies.get(cookie))
 
-    def _validate_request(self, request):
-        if request.status_code != 200:
-            return False
-        return True
-
     def _request(self, method, url, params, no_validate=False):
         """ Issues a request using the object's cookies, expects only status
         code 200 unless otherwise specified """
@@ -91,16 +89,17 @@ class GoogleSMS(object):
         """ Convenience for post requests """
         return self._request("POST", url, params)
 
-    def _validate_gv(self, request):
+    @staticmethod
+    def _validate_gv(request):
         """ Validates the content of the GV page after the requests completes.
         This will raise an error if the logged in user does not have a google
         voice number configured """
         soup = BeautifulSoup(request.text, "html.parser")
 
         scripts = soup.findAll("script")
-        gcData_script = scripts[-1]
-        gcData_text = gcData_script.text
-        if "'formatted'" not in gcData_text:
+        gc_data_script = scripts[-1]
+        gc_data_text = gc_data_script.text
+        if "'formatted'" not in gc_data_text:
             raise GoogleVoiceError('No GoogleVoice number found, have you '
                 'configured GoogleVoice?')
         # TODO: extract phone number

@@ -22,7 +22,7 @@ class TestPyGoogleSMS(unittest.TestCase):
         try:
             GoogleSMS(self.BAD_LOGIN, self.BAD_PASSWD)
         except pygooglesms.GoogleAuthError as error:
-            if error.msg == self.BAD_AUTH_MSG:
+            if error.message == self.BAD_AUTH_MSG:
                 return
             raise error
 
@@ -30,7 +30,7 @@ class TestPyGoogleSMS(unittest.TestCase):
         try:
             GoogleSMS(self.GOOD_LOGIN, self.BAD_PASSWD)
         except pygooglesms.GoogleAuthError as error:
-            if error.msg == self.BAD_AUTH_MSG:
+            if error.message == self.BAD_AUTH_MSG:
                 return
             raise error
 
@@ -43,7 +43,7 @@ class TestPyGoogleSMS(unittest.TestCase):
         try:
             sms.send(self.TEST_NUMBER, 'test_message')
         except pygooglesms.GoogleVoiceError as error:
-            if error.msg == self.NOT_LOGGED_IN_MSG:
+            if error.message == self.NOT_LOGGED_IN_MSG:
                 return
             raise error
 
