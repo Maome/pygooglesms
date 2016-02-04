@@ -1,7 +1,8 @@
 """
 pygooglesms.py
+Version: 1.0.1
 Author: Reilly Steele
-Modified: January 28th 2016
+Modified: Feburary 3rd 2016
 
 A super simple library used to send SMS messages from a google voice account.
 Absolutely inspired by pygooglevoice, thanks Joe McCall & Justin Quick.
